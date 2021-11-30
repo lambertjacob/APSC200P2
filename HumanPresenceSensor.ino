@@ -22,6 +22,7 @@ int holdTime = 0;
 #include <WiFiNINA.h>
 
 char ssid[] = "BELL603"; //Network name SSID
+
 char pass[] = "9462FF77173E"; //Network password
 
 int keyIndex = 0; //Only needed for WEP: Wired Equivalent Privacy is a security protocol,
@@ -45,7 +46,7 @@ void connect_WiFi(){
     Serial.print("Attempting to connect to SSID:");
     Serial.println(ssid);
     //connect to WPA/WPA2 network. CHange this line if using open or WEP network:
-    status = WiFi.begin(ssid,pass);
+    status = WiFi.begin(ssid, pass);
 
     //wait 10 seconds for  connection
 
@@ -76,44 +77,59 @@ void printWifiStatus(){
 //printWEB function declaration 
 
 void printWEB(int avail){
-  if(client){                   // if you get a client
-   
-    String currentLine = "";      // make a string to hold incoming data from the client 
-    while (client.connected()){
-      if(client.available()){
+  // listen for incoming clients
+  WiFiClient client = server.available();
+  if (client) {
+    Serial.println("new client");
+    // an http request ends with a blank line
+    boolean currentLineIsBlank = true;
+    while (client.connected()) {
+      if (client.available()) {
         char c = client.read();
         Serial.write(c);
-        if(c=='\n'){
-          //if current line is blank, you got two newline characters ina row
-          //thats the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0){
-            //HTTP headers always start with a response code (e.g. HTTP/1.1 200 Ok)
-            //and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println();
-            //create the buttons 
-            if(avail == 1){
-              client.println("Available");
-            }
-            else{
-              
+        // if you've gotten to the end of the line (received a newline
+        // character) and the line is blank, the http request has ended,
+        // so you can send a reply
+        if (c == '\n' && currentLineIsBlank) {
+          // send a standard http response header
+          
+          //put in all the needed code
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println("Connection: close");  // the connection will be closed after completion of the response
+          client.println("Refresh: 5");  // refresh the page automatically every 5 sec
+          client.println();
+          client.println("<!DOCTYPE HTML>");
+          client.println("<html>");
+          
+          //logic for our project
+          
+          
+          if(avail == 1){
+            client.println("Available");
+            
+            }else{
               client.println("Not Available");
-            }
-            client.println();
-            
-            //break out of the while loop:
-            break;
-          }
-          else {  //if you get a newline, then clear currentLine:
-            currentLine = "";
-            
-          }
+              }
+          client.println("</html>");
+
+          break;
         }
-        
-        
+        if (c == '\n') {
+          // you're starting a new line
+          currentLineIsBlank = true;
+        } else if (c != '\r') {
+          // you've gotten a character on the current line
+          currentLineIsBlank = false;
+        }
       }
     }
+    // give the web browser time to receive the data
+    delay(1);
+
+    // close the connection:
+    client.stop();
+    Serial.println("client disconnected");
   }
  }
 
@@ -143,10 +159,10 @@ void setup() {
 
 
   //<---Setup wifi----->
-  //enable_WiFi();
-  //connect_WiFi();
-  //server.begin();
-  //printWifiStatus();
+  enable_WiFi();
+  connect_WiFi();
+  server.begin();
+  printWifiStatus();
   //<---Setup wifi----->
 
   Serial.println("\nStarting up");
@@ -158,9 +174,6 @@ void setup() {
 void loop() {
   
   delay(1);
-  //see if the server is available
-  client = server.available();
-
   
   
   
@@ -192,7 +205,7 @@ void loop() {
          Serial.println("Seat Taken");
           avail = false;
           
-          //printWEB(0);
+          printWEB(0);
         }
     
         //if they read again add 100ms to the timer since that is the delay of the loop
@@ -204,7 +217,7 @@ void loop() {
 
          //the seat is still available
          avail = true;
-         //printWEB(1);
+         printWEB(1);
        
      
         }
@@ -214,7 +227,7 @@ void loop() {
        //if someone is there, hold the false value
       if(reading == 1){
           avail = false;
-          //printWEB(0);
+          printWEB(0);
 
           //reset the time that it was being held
          holdTime = 0;
@@ -227,14 +240,14 @@ void loop() {
         if(holdTime > 1500){
             Serial.println("Student Gone");
             avail = true;
-            //printWEB(1);
+            printWEB(1);
         }
         //time hasnt reached 15 seconds, hold
         else{
           Serial.println("Currently Holding seat");
           
             avail = false;
-            //printWEB(0);
+            printWEB(0);
           
         }
         //increase the time it has been held for
