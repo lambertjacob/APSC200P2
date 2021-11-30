@@ -1,7 +1,4 @@
-//define the pin connections for the transmission and recieving pins 
-//not usuing digital pins 1/0 made for tx/rx since they did not work
-int tx = 3;
-int rx = 2;
+
 
 //initialize variables to hold sensor readings
 int reading;
@@ -15,21 +12,123 @@ int timer = 0;
 //make a timer to hold a students seat
 int holdTime = 0;
 
-//include the library for the sensor and the library to allow tx/rx of data from sensor
-#include <SoftwareSerial.h>
+//include the library for the sensor 
+
 #include "DFRobot_mmWave_Radar.h"
 
 
-//need to allow for data transmission for the sensor using the library mmWave
-SoftwareSerial data(tx, rx);
+//<-------------------------------WIFI CODE-------------------------------->
+//include the library for the wifi arduino
+#include <WiFiNINA.h>
+
+char ssid[] = "BELL603"; //Network name SSID
+char pass[] = "9462FF77173E"; //Network password
+
+int keyIndex = 0; //Only needed for WEP: Wired Equivalent Privacy is a security protocol,
+//That standard is designed to provide a wireless local area network (WLAN) with a level 
+//of security and privacy comparable to what is usually expected of a wired LAN.
+int status = WL_IDLE_STATUS; //connection status 
+WiFiServer server(80); //server socket
+
+WiFiClient client = server.available(); 
+
+
+void enable_WiFi(){
+  //check for the WiFi module
+  if(WiFi.status()== WL_NO_MODULE){
+    Serial.println("Communication with WiFi module failed!");
+  }
+}
+void connect_WiFi(){
+  //attempt to connect to wifi network:
+  while(status != WL_CONNECTED){
+    Serial.print("Attempting to connect to SSID:");
+    Serial.println(ssid);
+    //connect to WPA/WPA2 network. CHange this line if using open or WEP network:
+    status = WiFi.begin(ssid,pass);
+
+    //wait 10 seconds for  connection
+
+    delay(10000);
+  }
+}
+
+void printWifiStatus(){
+  //print the SSID of the network youre attached to:
+  Serial.print("SSID:");
+  Serial.println(WiFi.SSID());
+
+  //print the board's IP address:
+  IPAddress ip = WiFi.localIP();
+  Serial.print("IP Address:");
+  Serial.println(ip);
+
+  //print the received signal strength:
+  long rssi = WiFi.RSSI();
+  Serial.print("signal strength (RSSI):");
+  Serial.print(rssi);
+  Serial.println("dBm");
+
+  Serial.print("To see this page in action, open a browser to http://");
+  Serial.print(ip);
+}
+
+//printWEB function declaration 
+
+void printWEB(int avail){
+  if(client){                   // if you get a client
+   
+    String currentLine = "";      // make a string to hold incoming data from the client 
+    while (client.connected()){
+      if(client.available()){
+        char c = client.read();
+        Serial.write(c);
+        if(c=='\n'){
+          //if current line is blank, you got two newline characters ina row
+          //thats the end of the client HTTP request, so send a response:
+          if (currentLine.length() == 0){
+            //HTTP headers always start with a response code (e.g. HTTP/1.1 200 Ok)
+            //and a content-type so the client knows what's coming, then a blank line:
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-type:text/html");
+            client.println();
+            //create the buttons 
+            if(avail == 1){
+              client.println("Available");
+            }
+            else{
+              
+              client.println("Not Available");
+            }
+            client.println();
+            
+            //break out of the while loop:
+            break;
+          }
+          else {  //if you get a newline, then clear currentLine:
+            currentLine = "";
+            
+          }
+        }
+        
+        
+      }
+    }
+  }
+ }
+
+//<-------------------------------WIFI CODE-------------------------------->
+
 
 //to construct, need to have data stream going out of tx pin and into rx pin
-DFRobot_mmWave_Radar hpSensor(&data);
+DFRobot_mmWave_Radar hpSensor(&Serial1);
 
 void setup() {
+  
+  
   //start serial monitor with baud rate needed for the human presence sensor
-  Serial.begin(115200);
-  data.begin(115200);
+  Serial.begin(9600);
+  Serial1.begin(115200);
   
   Serial.println("Loading...");
 
@@ -42,65 +141,85 @@ void setup() {
   //look into this
   hpSensor.OutputLatency(0, 0);
 
-  Serial.println("Starting up");
+
+  //<---Setup wifi----->
+  //enable_WiFi();
+  //connect_WiFi();
+  //server.begin();
+  //printWifiStatus();
+  //<---Setup wifi----->
+
+  Serial.println("\nStarting up");
   
   
 
 }
 
 void loop() {
-  //read the human presence sensor (1 -> detected, 0 -> nothing )
-  reading = hpSensor.readPresenceDetection();
   
-  // can be uncommented to see reading -> Serial.println(reading);
+  delay(1);
+  //see if the server is available
+  client = server.available();
 
-  //section to see if someone was walking by or actually there
-  //if it reads someone for 5 straight seconds then they are there
+  
+  
+  
+    //read the human presence sensor (1 -> detected, 0 -> nothing )
+    reading = hpSensor.readPresenceDetection();
+  
+    // can be uncommented to see reading -> 
+    Serial.println(reading);
+    //section to see if someone was walking by or actually there
+    //if it reads someone for 5 straight seconds then they are there
 
 
-  //if the seat was available before hand
-  if(avail){
+    //if the seat was available before hand
+    if(avail){
     
-    //was someone detected
-    if(reading == 1){
+      //was someone detected
+      if(reading == 1){
     
-    //if timer is zero then its detecting someone for the first time
-    if(timer == 0){
-        Serial.println("Student Detected");
-      }
+        //if timer is zero then its detecting someone for the first time
+        if(timer == 0){
+          Serial.println("Student Detected");
+        }
 
-    //if they are there for 5 seconds, change state to taken
-    //should be 5000 but was moving really slow in serial monitor 
-    //but it works like this for now
-    if(timer > 500){
+       //if they are there for 5 seconds, change state to taken
+        //should be 5000 but was moving really slow in serial monitor 
+        //but it works like this for now
+        if(timer > 800){
         
-        Serial.println("Seat Taken");
-        avail = false;
-      }
+         Serial.println("Seat Taken");
+          avail = false;
+          
+          //printWEB(0);
+        }
     
-    //if they read again add 100ms to the timer since that is the delay of the loop
-    timer += 100;
+        //if they read again add 100ms to the timer since that is the delay of the loop
+        timer += 100;
     
-    }else{
-      //they are no longer detected so reset the timer
-      timer = 0;
+        }else{
+         //they are no longer detected so reset the timer
+         timer = 0;
 
-      //the seat is still available
-      avail = true;
+         //the seat is still available
+         avail = true;
+         //printWEB(1);
        
      
-    }
-  }
-  //the case for if someone was actually there, we want to hold the seat for 15 seconds <- can change
-  else{
-     //if someone is there, hold the false value
-     if(reading == 1){
-        avail = false;
+        }
+     }
+    //the case for if someone was actually there, we want to hold the seat for 15 seconds <- can change
+    else{
+       //if someone is there, hold the false value
+      if(reading == 1){
+          avail = false;
+          //printWEB(0);
 
-        //reset the time that it was being held
-        holdTime = 0;
+          //reset the time that it was being held
+         holdTime = 0;
         
-      }
+        }
       //the case where they are no longer detected
       else{
 
@@ -108,11 +227,14 @@ void loop() {
         if(holdTime > 1500){
             Serial.println("Student Gone");
             avail = true;
+            //printWEB(1);
         }
         //time hasnt reached 15 seconds, hold
         else{
           Serial.println("Currently Holding seat");
+          
             avail = false;
+            //printWEB(0);
           
         }
         //increase the time it has been held for
@@ -120,7 +242,10 @@ void loop() {
         
       }
       
+    
   }
+  
+  
   
   
   //rerun every 100ms
