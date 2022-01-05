@@ -21,9 +21,9 @@ int holdTime = 0;
 //include the library for the wifi arduino
 #include <WiFiNINA.h>
 
-char ssid[] = "BELL603"; //Network name SSID
+char ssid[] = ""; //Network name SSID
 
-char pass[] = "9462FF77173E"; //Network password
+char pass[] = ""; //Network password
 
 int keyIndex = 0; //Only needed for WEP: Wired Equivalent Privacy is a security protocol,
 //That standard is designed to provide a wireless local area network (WLAN) with a level 
